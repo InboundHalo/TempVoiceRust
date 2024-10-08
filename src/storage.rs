@@ -5,6 +5,7 @@ use serde_json;
 use serenity::all::{ChannelId, GuildId, UserId};
 use serenity::prelude::*;
 use tokio::task;
+use std::collections::HashSet;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreatorChannelConfig {
@@ -12,7 +13,7 @@ pub struct CreatorChannelConfig {
     pub(crate) creator_id: ChannelId,
     pub(crate) category_id: ChannelId,
     pub(crate) naming_standard: String,
-    pub(crate) channel_numbers: Vec<u8>,
+    pub(crate) channel_numbers: HashSet<u8>,
     pub(crate) user_limit:u32
 }
 
@@ -21,7 +22,13 @@ impl CreatorChannelConfig {
         get_next_number(self, 1)
     }
 
+    pub(crate) fn add_number(&mut self, number: u8) -> bool {
+        self.channel_numbers.insert(number)
+    }
 
+    pub(crate) fn remove_number(&mut self, number: &u8) -> bool {
+        self.channel_numbers.remove(number)
+    }
 }
 
 fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: u8) -> u8 {
@@ -34,12 +41,12 @@ fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: u8) ->
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TemporaryVoiceChannel {
-    channel_id: ChannelId,
-    creator_id: ChannelId,
-    owner_id: UserId,
-    name: String,
-    template_name: String,
-    number: u8,
+    pub(crate) channel_id: ChannelId,
+    pub(crate) creator_id: ChannelId,
+    pub(crate) owner_id: UserId,
+    pub(crate) name: String,
+    pub(crate) template_name: String,
+    pub(crate) number: u8,
 }
 
 #[async_trait]
@@ -67,6 +74,7 @@ impl SQLiteStorage {
     }
 
     fn initialize_database(&self) -> Result<()> {
+
         let conn = Connection::open(&self.database_path)?;
         conn.execute_batch(
             "
