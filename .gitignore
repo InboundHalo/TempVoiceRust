@@ -1,0 +1,3 @@
+/target
+/.cargo
+my_test_database.db
