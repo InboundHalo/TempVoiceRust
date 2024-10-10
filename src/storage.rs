@@ -13,25 +13,25 @@ pub struct CreatorChannelConfig {
     pub(crate) creator_id: ChannelId,
     pub(crate) category_id: ChannelId,
     pub(crate) naming_standard: String,
-    pub(crate) channel_numbers: HashSet<u8>,
+    pub(crate) channel_numbers: HashSet<u16>,
     pub(crate) user_limit:u32
 }
 
 impl CreatorChannelConfig {
-    pub(crate) fn get_next_number(&self) -> u8 {
+    pub(crate) fn get_next_number(&self) -> u16 {
         get_next_number(self, 1)
     }
 
-    pub(crate) fn add_number(&mut self, number: u8) -> bool {
+    pub(crate) fn add_number(&mut self, number: u16) -> bool {
         self.channel_numbers.insert(number)
     }
 
-    pub(crate) fn remove_number(&mut self, number: &u8) -> bool {
+    pub(crate) fn remove_number(&mut self, number: &u16) -> bool {
         self.channel_numbers.remove(number)
     }
 }
 
-fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: u8) -> u8 {
+fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: u16) -> u16 {
     if creator_channel_config.channel_numbers.contains(&number) {
         get_next_number(creator_channel_config, number+1)
     } else {
@@ -46,7 +46,7 @@ pub struct TemporaryVoiceChannel {
     pub(crate) owner_id: UserId,
     pub(crate) name: String,
     pub(crate) template_name: String,
-    pub(crate) number: u8,
+    pub(crate) number: u16,
 }
 
 #[async_trait]

@@ -1,8 +1,10 @@
 use std::sync::Arc;
+
 use async_trait::async_trait;
-use serenity::all::{Channel, ChannelId, ChannelType, Context, CreateChannel, EventHandler, Member, Ready, VoiceState};
+use serenity::all::{Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, Member, Ready, VoiceState};
+
 use crate::SQLiteStorageKey;
-use crate::storage::{CreatorChannelConfig, SQLiteStorage, StorageType, TemporaryVoiceChannel};
+use crate::storage::{SQLiteStorage, StorageType, TemporaryVoiceChannel};
 
 pub(crate) struct Handler;
 
@@ -21,7 +23,7 @@ impl EventHandler for Handler {
 
         if storage.is_none() {
             println!("Storage is null!");
-            return;
+            panic!()
         }
 
         let storage = storage.unwrap();
@@ -35,7 +37,7 @@ impl EventHandler for Handler {
 
         // Member joins a voice channel
         if new.channel_id.is_some() {
-            on_voice_channel_join(&ctx, &storage, member, new.channel_id.unwrap()).await;
+            on_voice_channel_join(&ctx, &storage, member, new.channel_id.unwrap(), new.clone()).await;
         }
 
         // Member leaves a voice channel
@@ -49,13 +51,16 @@ async fn on_voice_channel_join(
     ctx: &Context,
     storage: &Arc<SQLiteStorage>,
     member: &Member,
-    channel_id: ChannelId
+    channel_id: ChannelId,
+    new: VoiceState
 ) {
     if let Some(mut config) = storage.get_creator_voice_config(channel_id).await {
         println!(
             "Member {} joined a creator channel: {:?}",
             member.user.name, config
         );
+
+        let creator_channel_id = channel_id;
 
         let number = config.get_next_number();
 
@@ -65,24 +70,38 @@ async fn on_voice_channel_join(
         let builder = builder.kind(ChannelType::Voice);
         let builder = builder.user_limit(config.user_limit);
         let builder = builder.category(config.category_id);
+        let builder = builder.position(number);
         let builder = builder.audit_log_reason("Temp voice bot");
 
-        let channel = config.guild_id.create_channel(&ctx.http, builder).await;
-
-        if channel.is_err() {
-            println!("Unable to create voice channel");
-            return;
-        }
-
-        let channel = channel.unwrap();
+        let channel = match config.guild_id.create_channel(&ctx.http, builder).await {
+            Ok(channel) => {
+                channel
+            }
+            Err(_) => {
+                println!("Something went wrong while creating a channel!");
+                return;
+            }
+        };
 
         let channel_id = channel.id;
+        match member.move_to_voice_channel(&ctx.http, channel_id).await {
+            Ok(_) => {
+                // Continue
+            }
+            Err(_) => {
+                println!("Unable to move user to voice channel");
+                return;
+            }
+        };
 
-        let result = member.move_to_voice_channel(&ctx.http, channel_id).await;
-
-        if result.is_err() {
-            println!("Unable to move user to voice channel");
-            return;
+        match creator_channel_id.edit(ctx, EditChannel::new().position(number+1)).await {
+            Ok(_) => {
+                println!("Channels moved successfully.");
+            }
+            Err(why) => {
+                println!("Error editing channel positions: {:?}", why);
+                // Do not return as this does not matter too much if it fails
+            }
         }
 
         match config.add_number(number) {
