@@ -59,11 +59,6 @@ async fn on_voice_channel_join(
         let owner_id = user.id;
         let owner_name = member.display_name();
 
-        println!(
-            "Member {} joined a creator channel: {:?}",
-            owner_name, config
-        );
-
         let creator_channel_id = channel_id;
         let number = config.get_next_number();
 
@@ -84,8 +79,7 @@ async fn on_voice_channel_join(
             .category(config.category_id)
             .position(number)
             .permissions(vec![PermissionOverwrite {
-                allow: Permissions::KICK_MEMBERS
-                    | Permissions::MOVE_MEMBERS
+                allow: Permissions::MOVE_MEMBERS
                     | Permissions::MANAGE_CHANNELS,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(member.user.id),
@@ -134,12 +128,8 @@ async fn on_voice_channel_join(
                     {
                         println!("Error editing channel positions: {:?}", why);
                         // Do not return as this does not matter too much if it fails
-                    } else {
-                        println!("Channels moved successfully.");
                     }
                 }
-
-                println!("Created voice channel: {}", channel.name);
             } else {
                 panic!("Highest number not found");
             }
@@ -159,30 +149,23 @@ async fn on_voice_channel_leave(
     old_voice_state: VoiceState,
 ) {
     let old_channel_id = match old_voice_state.channel_id {
-        None => {
-            println!("User was not in a voice channel previously.");
-            return;
-        }
+        None => return,
         Some(old_channel_id) => old_channel_id
     };
 
     let temp_channel = match storage.get_temporary_voice_channel(&old_channel_id).await {
-        None => {
-            println!("Member {} left a regular channel", member.user.name);
-            return;
-        }
+        None => return,
         Some(temp_channel) => temp_channel
     };
 
-    println!(
-        "Member {} left a temporary voice channel: {:?}",
-        member.user.name, temp_channel
-    );
-
     let channel = match old_channel_id.to_channel(ctx).await {
         Ok(Channel::Guild(channel)) => channel,
+        Err(why) => {
+            println!("Failed to retrieve the channel or it is not a guild channel: {}", why);
+            return;
+        }
         _ => {
-            println!("Failed to retrieve the channel or it is not a guild channel.");
+            println!("Failed to retrieve the channel or it is not a guild channel. No error");
             return;
         }
     };
