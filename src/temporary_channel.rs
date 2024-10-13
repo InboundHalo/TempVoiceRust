@@ -25,7 +25,7 @@ impl TemporaryVoiceChannel {
         owner_id: UserId,
         name: String,
         template_name: String,
-        number: u16
+        number: u16,
     ) -> Self {
         Self {
             guild_id,
@@ -37,15 +37,13 @@ impl TemporaryVoiceChannel {
             number,
         }
     }
-
-
 }
 
 pub(crate) fn get_name_from_template(
     template_name: &String,
     number: &u16,
     presence: Option<Presence>,
-    user_name: &str
+    user_name: &str,
 ) -> String {
     let current_activity = get_presence_str(presence).unwrap_or_else(|| "No Game".to_string());
 
@@ -81,7 +79,7 @@ fn get_presence_str(presence: Option<Presence>) -> Option<String> {
                 }
             }
 
-            return None
+            return None;
         }
     }
 }
@@ -133,16 +131,16 @@ fn get_end_modifiers(first_char_of_member_name: char) -> Vec<&'static str> {
     let first_char_of_member_name = normalize_char(first_char_of_member_name);
 
     return match first_char_of_member_name.to_ascii_lowercase() {
-        'a' => vec!["Atrium", "Arcade", "Arena"],
+        'a' => vec!["Atrium", "Arcade", "Arena", "Area"],
         'b' => vec!["Bureau", "Base", "Building"],
-        'c' => vec!["Corner", "Court", "Cave"],
-        'd' => vec!["Domain", "Den", "Depot"],
+        'c' => vec!["Corner", "Court", "Cave", "City"],
+        'd' => vec!["Domain", "Den", "Depot", "District"],
         'e' => vec!["Estate", "Embassy", "Entrance"],
         'f' => vec!["Fortress", "Farmhouse", "Factory"],
         'g' => vec!["Grounds", "Gallery", "Garden"],
         'h' => vec!["Haven", "Hall", "Harbor"],
         'i' => vec!["Institute", "Inn", "Island"],
-        'j' => vec!["Junction", "Jetty", "Jungle"],
+        'j' => vec!["Junction", "Jungle"],
         'k' => vec!["Kingdom", "Keep", "Kitchen"],
         'l' => vec!["Loft", "Library", "Lodge"],
         'm' => vec!["Manor", "Museum", "Mill"],
@@ -151,21 +149,17 @@ fn get_end_modifiers(first_char_of_member_name: char) -> Vec<&'static str> {
         'p' => vec!["Plaza", "Palace", "Parlor"],
         'q' => vec!["Quarters", "Quay", "Quadrangle"],
         'r' => vec!["Room", "Resort", "Retreat"],
-        's' => vec!["Studio", "Sanctuary", "Store"],
+        's' => vec!["Studio", "Sanctuary", "Store", "Sector", "Section"],
         't' => vec!["Territory", "Tower", "Temple"],
-        'u' => vec!["Urban Area", "University", "Uplands"],
+        'u' => vec!["University"],
         'v' => vec!["Villa", "Valley", "Vault"],
         'w' => vec!["Workshop", "Warehouse", "Wharf"],
         'x' => vec!["Xystus"],
         'y' => vec!["Yard", "Yacht", "Yardhouse"],
-        'z' => vec!["Zone", "Ziggurat", "Zenith"],
+        'z' => vec!["Zone"],
         _ => vec!["VC"],
     };
 }
-
-
-
-
 
 #[cfg(test)]
 mod tests {
