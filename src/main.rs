@@ -1,38 +1,36 @@
-use std::collections::HashSet;
 use std::env;
 use std::sync::Arc;
 
-use serde::{Deserialize, Serialize};
-use serenity::all::{ChannelId, EventHandler, GatewayIntents, GuildId};
+use serenity::all::{EventHandler, GatewayIntents};
 use serenity::Client;
 use serenity::prelude::TypeMapKey;
 
-use crate::storage::{CreatorChannelConfig, SQLiteStorage, StorageType};
+use crate::storage::{SQLiteStorage, Storage};
 
 mod storage;
 mod event_handler;
+mod creator_channel;
+mod temporary_channel;
 
-pub(crate) struct SQLiteStorageKey;
+pub(crate) struct StorageKey;
 
-impl TypeMapKey for SQLiteStorageKey {
-    type Value = Arc<SQLiteStorage>;
+impl TypeMapKey for StorageKey {
+    type Value = Arc<dyn Storage + Send + Sync>;
 }
 
 #[tokio::main]
 async fn main() {
     println!("Starting up");
-    
-    let storage = Arc::new(
+
+    let storage: Arc<dyn Storage + Send + Sync> = Arc::new(
         SQLiteStorage::new("my_test_database.db").expect("Failed to initialize storage"),
     );
 
     let mut client: Client = setup_discord_bot().await;
 
-    // Find out why this only works with {}
-    {
-        let mut data = client.data.write().await;
-        data.insert::<SQLiteStorageKey>(Arc::clone(&storage));
-    }
+    let mut data = client.data.write().await;
+    data.insert::<StorageKey>(Arc::clone(&storage));
+    drop(data);
 
     if let Err(why) = client.start().await {
         println!("Client error: {:?}", why);
