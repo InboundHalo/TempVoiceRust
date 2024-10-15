@@ -25,15 +25,9 @@ impl CreatorChannelConfig {
     pub(crate) fn remove_number(&mut self, number: &u16) -> bool {
         self.channel_numbers.remove(number)
     }
-
+    
     pub(crate) fn get_highest_number(&self) -> Option<u16> {
-        let length = self.channel_numbers.len();
-
-        return if length == 0 {
-            None
-        } else {
-            Some(get_highest_number(self, length as u16))
-        }
+        self.channel_numbers.iter().max().cloned()
     }
 }
 
@@ -42,14 +36,6 @@ fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: u16) -
         get_next_number(creator_channel_config, number+1)
     } else {
         return number
-    }
-}
-
-fn get_highest_number(creator_channel_config: &CreatorChannelConfig, number: u16) -> u16 {
-    if creator_channel_config.channel_numbers.contains(&number) {
-        number
-    } else {
-        get_highest_number(creator_channel_config, number-1)
     }
 }
 
