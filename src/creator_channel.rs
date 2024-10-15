@@ -10,7 +10,7 @@ pub struct CreatorChannelConfig {
     pub(crate) category_id: ChannelId,
     pub(crate) naming_standard: String,
     pub(crate) channel_numbers: HashSet<u16>,
-    pub(crate) user_limit:u32
+    pub(crate) user_limit: u32,
 }
 
 impl CreatorChannelConfig {
@@ -25,7 +25,7 @@ impl CreatorChannelConfig {
     pub(crate) fn remove_number(&mut self, number: &u16) -> bool {
         self.channel_numbers.remove(number)
     }
-    
+
     pub(crate) fn get_highest_number(&self) -> Option<u16> {
         self.channel_numbers.iter().max().cloned()
     }
@@ -33,16 +33,16 @@ impl CreatorChannelConfig {
 
 fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: u16) -> u16 {
     if creator_channel_config.channel_numbers.contains(&number) {
-        get_next_number(creator_channel_config, number+1)
+        get_next_number(creator_channel_config, number + 1)
     } else {
-        return number
+        return number;
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::collections::HashSet;
     use crate::creator_channel::CreatorChannelConfig;
+    use std::collections::HashSet;
 
     #[test]
     fn check_channel_numbers() {

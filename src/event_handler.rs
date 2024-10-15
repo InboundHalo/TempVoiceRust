@@ -1,21 +1,52 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serenity::all::{Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, Member, PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState};
-use serenity::model::Permissions;
-use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
 use crate::storage::Storage;
+use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
 use crate::StorageKey;
+use async_trait::async_trait;
+use serenity::all::{
+    Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, Member,
+    PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState,
+};
+use serenity::model::Permissions;
 
 pub(crate) struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
-    async fn ready(&self, _ctx: Context, data_about_bot: Ready) {
+    async fn ready(&self, ctx: Context, data_about_bot: Ready) {
         println!("{} is connected!", data_about_bot.user.name);
+
+        match {
+            let data_read = ctx.data.read().await;
+            data_read.get::<StorageKey>().cloned()
+        } {
+            None => {
+                println!("Storage is null!");
+                panic!()
+            }
+            Some(storage) => storage,
+        };
+
+        println!("{} is ready!", data_about_bot.user.name);
     }
 
     async fn voice_state_update(&self, ctx: Context, old: Option<VoiceState>, new: VoiceState) {
+        // Check if we need to check the database
+        let change_channels = match old {
+            None => true,
+            Some(ref old) => old.channel_id != new.channel_id,
+        };
+
+        if !change_channels {
+            return;
+        }
+
+        let member = match new.member {
+            Some(ref member) => member,
+            None => return,
+        };
+
         let storage = match {
             let data_read = ctx.data.read().await;
             data_read.get::<StorageKey>().cloned()
@@ -24,16 +55,7 @@ impl EventHandler for Handler {
                 println!("Storage is null!");
                 panic!()
             }
-            Some(storage) => {
-                storage
-            }
-        };
-
-
-        // Make sure we have a member
-        let member = match new.member {
-            Some(ref member) => member,
-            None => return,
+            Some(storage) => storage,
         };
 
         // Member joins a voice channel
@@ -43,7 +65,7 @@ impl EventHandler for Handler {
 
         // Member leaves a voice channel
         if old.is_some() {
-            on_voice_channel_leave(&ctx, &storage, member, old.unwrap()).await;
+            on_voice_channel_leave(&ctx, &storage, old.unwrap()).await;
         }
     }
 }
@@ -65,13 +87,8 @@ async fn on_voice_channel_join(
         let naming_standard = config.naming_standard.clone();
 
         let user_presence = get_user_presence(ctx, &config.guild_id, &owner_id);
-        let channel_name = get_name_from_template(
-            &naming_standard,
-            &number,
-            user_presence,
-            owner_name,
-        );
-
+        let channel_name =
+            get_name_from_template(&naming_standard, &number, user_presence, owner_name);
 
         let builder = CreateChannel::new(channel_name.clone())
             .kind(ChannelType::Voice)
@@ -79,12 +96,13 @@ async fn on_voice_channel_join(
             .category(config.category_id)
             .position(number)
             .permissions(vec![PermissionOverwrite {
-                allow: Permissions::MOVE_MEMBERS
-                    | Permissions::MANAGE_CHANNELS,
+                allow: Permissions::MOVE_MEMBERS | Permissions::MANAGE_CHANNELS,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(member.user.id),
             }])
-            .audit_log_reason("Temp voice bot");
+            .audit_log_reason("Temp voice bot")
+            .nsfw(false)
+            .bitrate(96000);
 
         // Create the channel
         let channel = match config.guild_id.create_channel(&ctx.http, builder).await {
@@ -137,31 +155,31 @@ async fn on_voice_channel_join(
             println!("Something went wrong!");
             todo!();
         }
-    } else {
-        println!("Member {} joined a regular channel", member.user.name);
     }
 }
 
 async fn on_voice_channel_leave(
     ctx: &Context,
     storage: &Arc<impl Storage + Send + Sync + ?Sized>,
-    member: &Member,
     old_voice_state: VoiceState,
 ) {
     let old_channel_id = match old_voice_state.channel_id {
         None => return,
-        Some(old_channel_id) => old_channel_id
+        Some(old_channel_id) => old_channel_id,
     };
 
     let temp_channel = match storage.get_temporary_voice_channel(&old_channel_id).await {
         None => return,
-        Some(temp_channel) => temp_channel
+        Some(temp_channel) => temp_channel,
     };
 
     let channel = match old_channel_id.to_channel(ctx).await {
         Ok(Channel::Guild(channel)) => channel,
         Err(why) => {
-            println!("Failed to retrieve the channel or it is not a guild channel: {}", why);
+            println!(
+                "Failed to retrieve the channel or it is not a guild channel: {}",
+                why
+            );
             return;
         }
         _ => {
@@ -172,7 +190,6 @@ async fn on_voice_channel_leave(
 
     let guild_id = channel.guild_id;
     let voice_channel_id = channel.id;
-
 
     let member_count = {
         let guild = match guild_id.to_guild_cached(ctx) {
@@ -192,15 +209,19 @@ async fn on_voice_channel_leave(
         count
     };
 
-    println!("There are {} members left in the channel.", member_count);
+    println!(
+        "There are {} members left in the channel {}.",
+        member_count, temp_channel.number
+    );
 
     if member_count == 0 {
         println!("No members left, deleting the channel");
         match channel.delete(&ctx.http).await {
             Ok(_) => {
-                match storage.get_creator_voice_config(
-                    &temp_channel.creator_id
-                ).await {
+                match storage
+                    .get_creator_voice_config(&temp_channel.creator_id)
+                    .await
+                {
                     None => {
                         println!("Something went very wrong when deleting a channel!");
                         todo!()
@@ -208,7 +229,10 @@ async fn on_voice_channel_leave(
                     Some(mut creator_channel_config) => {
                         creator_channel_config.remove_number(&temp_channel.number);
 
-                        storage.set_creator_voice_config(&creator_channel_config).await
+                        storage
+                            .set_creator_voice_config(&creator_channel_config)
+                            .await;
+                        storage.delete_temporary_voice_channel(&channel.id).await;
                     }
                 }
             }
