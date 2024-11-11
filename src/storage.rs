@@ -13,6 +13,7 @@ pub trait Storage: Send + Sync {
         channel_id: &ChannelId,
     ) -> Option<CreatorChannelConfig>;
     async fn set_creator_voice_config(&self, creator_config: &CreatorChannelConfig);
+    async fn delete_creator_voice_config(&self, channel_id: &ChannelId);
 
     async fn get_temporary_voice_channel(
         &self,
@@ -77,8 +78,8 @@ impl Storage for SQLiteStorage {
                 None
             }
         })
-        .await
-        .unwrap_or(None)
+            .await
+            .unwrap_or(None)
     }
 
     async fn set_creator_voice_config(&self, creator_config: &CreatorChannelConfig) {
@@ -94,10 +95,25 @@ impl Storage for SQLiteStorage {
                 ",
                 params![channel_id_u64, config_data],
             )
-            .ok()
+                .ok()
         })
-        .await
-        .expect("TODO: panic message");
+            .await
+            .expect("TODO: panic message");
+    }
+
+    async fn delete_creator_voice_config(&self, channel_id: &ChannelId) {
+        let db_path = self.database_path.clone();
+        let channel_id_u64 = channel_id.get();
+        task::spawn_blocking(move || {
+            let conn = Connection::open(db_path).ok()?;
+            conn.execute(
+                "DELETE FROM creator_channel_config WHERE channel_id = ?1",
+                params![channel_id_u64],
+            )
+                .ok()
+        })
+            .await
+            .expect("Failed to delete creator voice channel");
     }
 
     async fn get_temporary_voice_channel(
@@ -121,8 +137,8 @@ impl Storage for SQLiteStorage {
                 None
             }
         })
-        .await
-        .unwrap_or(None)
+            .await
+            .unwrap_or(None)
     }
 
     async fn set_temporary_voice_channel(&self, temporary_channel: &TemporaryVoiceChannel) {
@@ -138,10 +154,10 @@ impl Storage for SQLiteStorage {
                 ",
                 params![channel_id_u64, config_data],
             )
-            .ok()
+                .ok()
         })
-        .await
-        .expect("TODO: panic message");
+            .await
+            .expect("TODO: panic message");
     }
 
     async fn delete_temporary_voice_channel(&self, channel_id: &ChannelId) {
@@ -153,10 +169,10 @@ impl Storage for SQLiteStorage {
                 "DELETE FROM temporary_voice_channel WHERE channel_id = ?1",
                 params![channel_id_u64],
             )
-            .ok()
+                .ok()
         })
-        .await
-        .expect("Failed to delete temporary voice channel");
+            .await
+            .expect("Failed to delete temporary voice channel");
     }
 
     async fn get_all_temporary_voice_channels(&self) -> Option<Vec<TemporaryVoiceChannel>> {
@@ -182,7 +198,7 @@ impl Storage for SQLiteStorage {
 
             Some(temp_channels)
         })
-        .await
-        .unwrap_or(None)
+            .await
+            .unwrap_or(None)
     }
 }
