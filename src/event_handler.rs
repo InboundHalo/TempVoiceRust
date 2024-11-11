@@ -2,19 +2,49 @@ use std::sync::Arc;
 
 use crate::storage::Storage;
 use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
-use crate::{StorageKey};
+use crate::StorageKey;
 use async_trait::async_trait;
-use serenity::all::{Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, GuildChannel, Member, PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState};
+use serenity::all::{Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, GuildChannel, Member, Message, PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState};
 use serenity::model::Permissions;
-use crate::creator_channel::CreatorChannelConfig;
 
 pub(crate) struct Handler;
 
 #[async_trait]
 impl EventHandler for Handler {
+    async fn channel_delete(&self, ctx: Context, channel: GuildChannel, messages: Option<Vec<Message>>) {
+        let storage = {
+            let data_read = ctx.data.read().await;
+            match data_read.get::<StorageKey>().cloned() {
+                None => {
+                    println!("Storage is null!");
+                    panic!()
+                }
+                Some(storage) => storage,
+            }
+        };
+
+        match storage.get_temporary_voice_channel(&channel.id).await {
+            None => {}
+            Some(_) => {
+                println!("Temporary voice channel removed!");
+                storage.delete_temporary_voice_channel(&channel.id).await;
+                return;
+            }
+        }
+
+        match storage.get_creator_voice_config(&channel.id).await {
+            None => {}
+            Some(_) => {
+                println!("Voice creator config removed!");
+                storage.delete_creator_voice_config(&channel.id).await;
+                return;
+            }
+        }
+    }
+
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
-        
+
         println!("{} is ready!", ready.user.name);
     }
 
@@ -46,19 +76,19 @@ impl EventHandler for Handler {
                 None => {} // This means they did not join a creator channel
                 Some(result) => {
                     match result {
-                    Ok(_channel) => {}
-                    Err(why) => {
-                        println!("Error joining channel: {:?}", why);
-                        match member.disconnect_from_voice(&ctx).await {
-                            Ok(_) => {
-                                println!("Disconnected from voice channel");
-                            }
-                            Err(_) => {
-                                println!("Failed to disconnect from voice channel");
-                            }
-                        };
-                    }
+                        Ok(_channel) => {}
+                        Err(why) => {
+                            println!("Error joining channel: {:?}", why);
+                            match member.disconnect_from_voice(&ctx).await {
+                                Ok(_) => {
+                                    println!("Disconnected from voice channel");
+                                }
+                                Err(_) => {
+                                    println!("Failed to disconnect from voice channel");
+                                }
+                            };
                         }
+                    }
                 }
             };
         }
@@ -88,7 +118,7 @@ async fn on_voice_channel_join(
 
     let number = config.get_next_number();
     let user_presence = get_user_presence(ctx, &guild_id, &voice_channel_owner_id);
-    
+
     let channel_name =
         get_name_from_template(&naming_standard, &number, user_presence, voice_channel_owner_name);
 
