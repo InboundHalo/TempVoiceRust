@@ -165,8 +165,8 @@ fn get_end_modifiers(first_char_of_member_name: char) -> Vec<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use std::num::NonZeroU16;
     use crate::temporary_channel::{get_end_modifiers, get_name_from_template};
+    use std::num::NonZeroU16;
 
     #[test]
     fn check_template_name_1() {

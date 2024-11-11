@@ -1,7 +1,7 @@
-use std::collections::HashSet;
-use std::num::{NonZero, NonZeroU16};
 use serde::{Deserialize, Serialize};
 use serenity::all::{ChannelId, GuildId};
+use std::collections::HashSet;
+use std::num::{NonZero, NonZeroU16};
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CreatorChannelConfig {
