@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 mod commands;
+mod cool_down_manager;
 
 use crate::storage::Storage;
 use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
@@ -13,8 +14,19 @@ use serenity::all::{
 };
 use serenity::builder::CreateInteractionResponseMessage;
 use serenity::model::Permissions;
+use crate::event_handler::cool_down_manager::CooldownManager;
 
-pub(crate) struct Handler;
+pub(crate) struct Handler {
+    cooldown_manager: CooldownManager
+}
+
+impl Handler {
+    pub fn new() -> Self {
+        Self {
+            cooldown_manager: CooldownManager::new(),
+        }
+    }
+}
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -129,7 +141,7 @@ impl EventHandler for Handler {
             let command_name = command.data.name.as_str();
 
             let response = match command_name {
-                "invite" => commands::invite::run(&ctx, &command).await,
+                "invite" => commands::invite::run(&ctx, &command, &self.cooldown_manager).await,
                 _ => CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .ephemeral(true)

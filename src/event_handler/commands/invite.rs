@@ -1,9 +1,7 @@
-use serenity::all::{
-    ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType,
-    Context, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Mentionable,
-    User, UserId, VoiceState,
-};
-use serenity::builder::{CreateCommand, CreateCommandOption};
+use serenity::all::{ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Mentionable, Message, User, UserId, VoiceState};
+use serenity::builder::{CreateCommand, CreateCommandOption, CreateMessage};
+
+use crate::event_handler::cool_down_manager::CooldownManager;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("invite")
@@ -14,17 +12,8 @@ pub fn register() -> CreateCommand {
         )
 }
 
-pub async fn run(ctx: &Context, command: &CommandInteraction) -> CreateInteractionResponse {
-    let invited_user = match get_invited_user(&command) {
-        None => {
-            return CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .ephemeral(true)
-                    .content("You must mention a user to invite."),
-            );
-        }
-        Some(user_id) => user_id,
-    };
+pub async fn run(ctx: &Context, command: &CommandInteraction, cooldown_manager: &CooldownManager) -> CreateInteractionResponse {
+    let inviter = &command.user;
 
     let guild_id = match command.guild_id {
         None => {
@@ -37,17 +26,28 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> CreateInteracti
         Some(guild_id) => guild_id,
     };
 
-    let inviter = &command.user;
-    let guild = guild_id.to_guild_cached(&ctx).unwrap();
-
-    let voice_channel_id = match get_voice_channel_id(guild.voice_states.get(&inviter.id)) {
+    let invited_user = match get_invited_user(&command) {
         None => {
             return CreateInteractionResponse::Message(
                 CreateInteractionResponseMessage::new()
                     .ephemeral(true)
-                    .content("You must be in a voice channel to use this command."),
-            )
+                    .content("You must mention a user to invite."),
+            );
         }
+        Some(user_id) => user_id,
+    };
+
+    if !cooldown_manager.can_user_ping_user(&inviter.id, &invited_user) {
+        return ephemeral_response("Please wait as you have already pinged this person!");
+    }
+
+    if invited_user.to_user(&ctx).await.unwrap().bot {
+        return ephemeral_response("You can not invite a bot!");
+    }
+
+    let guild = guild_id.to_guild_cached(&ctx).unwrap().clone();
+    let voice_channel_id = match get_voice_channel_id(guild.voice_states.get(&inviter.id)) {
+        None => return ephemeral_response("You must be in a voice channel to use this command."),
         Some(channel_id) => channel_id,
     };
 
@@ -61,9 +61,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction) -> CreateInteracti
 
     match dm_result {
         Err(_) => CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .ephemeral(true)
-                .content("Failed to send the invitation. The user might have DMs disabled."),
+            ephemeral_response("Failed to send the invitation. The user might have DMs disabled."),
         ),
         Ok(_) => CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
@@ -77,16 +75,21 @@ async fn dm_user(
     invited_user: &UserId,
     inviter: &User,
     channel_invite: String,
-) -> Result<(), serenity::Error> {
-    invited_user
-        .direct_message(&ctx.http, |m| {
-            m.content(format!(
-                "Hey, {} invited you to join the voice channel: {}",
+) -> serenity::Result<Message> {
+    invited_user.direct_message(
+        &ctx,
+        CreateMessage::new()
+            .content(format!("Hey, {} invited you to join the voice channel: {}",
                 inviter.mention(),
                 channel_invite
             ))
-        })
-        .await
+    ).await
+}
+
+fn ephemeral_response(string: &str) -> CreateInteractionResponse::Message {
+    CreateInteractionResponseMessage::new()
+        .ephemeral(true)
+        .content(string)
 }
 
 fn get_invited_user(command: &CommandInteraction) -> Option<&UserId> {
