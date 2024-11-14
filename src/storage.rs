@@ -1,21 +1,25 @@
+use crate::creator_channel::CreatorChannelConfig;
+use crate::temporary_channel::TemporaryVoiceChannel;
 use async_trait::async_trait;
-use rusqlite::{Connection, params};
+use rusqlite::{params, Connection};
 use serde_json;
 use serenity::all::ChannelId;
 use tokio::task;
-use crate::creator_channel::CreatorChannelConfig;
-use crate::temporary_channel::TemporaryVoiceChannel;
 
 #[async_trait]
 pub trait Storage: Send + Sync {
-    async fn get_creator_voice_config(&self, channel_id: &ChannelId) -> Option<CreatorChannelConfig>;
+    async fn get_creator_voice_config(
+        &self,
+        channel_id: &ChannelId,
+    ) -> Option<CreatorChannelConfig>;
     async fn set_creator_voice_config(&self, creator_config: &CreatorChannelConfig);
 
-    async fn get_temporary_voice_channel(&self, channel_id: &ChannelId) -> Option<TemporaryVoiceChannel>;
+    async fn get_temporary_voice_channel(
+        &self,
+        channel_id: &ChannelId,
+    ) -> Option<TemporaryVoiceChannel>;
     async fn set_temporary_voice_channel(&self, temporary_channel: &TemporaryVoiceChannel);
 }
-
-
 
 pub struct SQLiteStorage {
     database_path: String,
@@ -31,7 +35,6 @@ impl SQLiteStorage {
     }
 
     fn initialize_database(&self) -> rusqlite::Result<()> {
-
         let conn = Connection::open(&self.database_path)?;
         conn.execute_batch(
             "
@@ -52,7 +55,10 @@ impl SQLiteStorage {
 
 #[async_trait]
 impl Storage for SQLiteStorage {
-    async fn get_creator_voice_config(&self, channel_id: &ChannelId) -> Option<CreatorChannelConfig> {
+    async fn get_creator_voice_config(
+        &self,
+        channel_id: &ChannelId,
+    ) -> Option<CreatorChannelConfig> {
         let db_path = self.database_path.clone();
         let channel_id_u64 = channel_id.get();
         task::spawn_blocking(move || {
@@ -69,8 +75,8 @@ impl Storage for SQLiteStorage {
                 None
             }
         })
-            .await
-            .unwrap_or(None)
+        .await
+        .unwrap_or(None)
     }
 
     async fn set_creator_voice_config(&self, creator_config: &CreatorChannelConfig) {
@@ -86,12 +92,16 @@ impl Storage for SQLiteStorage {
             ",
                 params![channel_id_u64, config_data],
             )
-                .ok()
+            .ok()
         })
-            .await.expect("TODO: panic message");
+        .await
+        .expect("TODO: panic message");
     }
 
-    async fn get_temporary_voice_channel(&self, channel_id: &ChannelId) -> Option<TemporaryVoiceChannel> {
+    async fn get_temporary_voice_channel(
+        &self,
+        channel_id: &ChannelId,
+    ) -> Option<TemporaryVoiceChannel> {
         let db_path = self.database_path.clone();
         let channel_id_u64 = channel_id.get();
         task::spawn_blocking(move || {
@@ -102,14 +112,15 @@ impl Storage for SQLiteStorage {
             let mut rows = stmt.query(params![channel_id_u64]).ok()?;
             if let Some(row) = rows.next().ok()? {
                 let config_data: String = row.get(0).ok()?;
-                let temp_channel: TemporaryVoiceChannel = serde_json::from_str(&config_data).ok()?;
+                let temp_channel: TemporaryVoiceChannel =
+                    serde_json::from_str(&config_data).ok()?;
                 Some(temp_channel)
             } else {
                 None
             }
         })
-            .await
-            .unwrap_or(None)
+        .await
+        .unwrap_or(None)
     }
 
     async fn set_temporary_voice_channel(&self, temporary_channel: &TemporaryVoiceChannel) {
@@ -125,8 +136,9 @@ impl Storage for SQLiteStorage {
             ",
                 params![channel_id_u64, config_data],
             )
-                .ok()
+            .ok()
         })
-            .await.expect("TODO: panic message");
+        .await
+        .expect("TODO: panic message");
     }
 }

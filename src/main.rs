@@ -2,14 +2,14 @@ use std::env;
 use std::sync::Arc;
 
 use serenity::all::{EventHandler, GatewayIntents};
-use serenity::Client;
 use serenity::prelude::TypeMapKey;
+use serenity::Client;
 
 use crate::storage::{SQLiteStorage, Storage};
 
-mod storage;
-mod event_handler;
 mod creator_channel;
+mod event_handler;
+mod storage;
 mod temporary_channel;
 
 pub(crate) struct StorageKey;
@@ -22,9 +22,8 @@ impl TypeMapKey for StorageKey {
 async fn main() {
     println!("Starting up");
 
-    let storage: Arc<dyn Storage + Send + Sync> = Arc::new(
-        SQLiteStorage::new("my_test_database.db").expect("Failed to initialize storage"),
-    );
+    let storage: Arc<dyn Storage + Send + Sync> =
+        Arc::new(SQLiteStorage::new("my_test_database.db").expect("Failed to initialize storage"));
 
     let mut client: Client = setup_discord_bot().await;
 

@@ -53,20 +53,21 @@ pub(crate) fn get_name_from_template(
         .replace("%room%", get_end_modifier(user_name))
         .replace("%current_activity%", current_activity.as_str())
 }
-pub(crate) fn get_user_presence(ctx: &Context, guild_id: &GuildId, user_id: &UserId) -> Option<Presence> {
+pub(crate) fn get_user_presence(
+    ctx: &Context,
+    guild_id: &GuildId,
+    user_id: &UserId,
+) -> Option<Presence> {
     match guild_id.to_guild_cached(ctx) {
         None => None,
         Some(guild_ref) => {
             return match guild_ref.presences.get(user_id) {
                 None => None,
-                Some(presence) => {
-                    Some(presence.to_owned())
-                }
+                Some(presence) => Some(presence.to_owned()),
             }
         }
     }
 }
-
 
 fn get_presence_str(presence: Option<Presence>) -> Option<String> {
     match presence {
@@ -181,9 +182,6 @@ mod tests {
         let room = name.strip_prefix("ⱤoᵀᴛᵥƝₓˣ's ");
         assert_eq!(room.is_some(), true); // Assert that the prefix is "ⱤoᵀᴛᵥƝₓˣ's "
 
-        assert!(
-            get_end_modifiers('Ɽ')
-                .contains(&room.unwrap())
-        );
+        assert!(get_end_modifiers('Ɽ').contains(&room.unwrap()));
     }
 }

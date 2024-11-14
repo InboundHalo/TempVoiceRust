@@ -1,11 +1,14 @@
 use std::sync::Arc;
 
-use async_trait::async_trait;
-use serenity::all::{Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, Member, PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState};
-use serenity::model::Permissions;
-use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
 use crate::storage::Storage;
+use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
 use crate::StorageKey;
+use async_trait::async_trait;
+use serenity::all::{
+    Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler, Member,
+    PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState,
+};
+use serenity::model::Permissions;
 
 pub(crate) struct Handler;
 
@@ -24,11 +27,8 @@ impl EventHandler for Handler {
                 println!("Storage is null!");
                 panic!()
             }
-            Some(storage) => {
-                storage
-            }
+            Some(storage) => storage,
         };
-
 
         // Make sure we have a member
         let member = match new.member {
@@ -65,13 +65,8 @@ async fn on_voice_channel_join(
         let naming_standard = config.naming_standard.clone();
 
         let user_presence = get_user_presence(ctx, &config.guild_id, &owner_id);
-        let channel_name = get_name_from_template(
-            &naming_standard,
-            &number,
-            user_presence,
-            owner_name,
-        );
-
+        let channel_name =
+            get_name_from_template(&naming_standard, &number, user_presence, owner_name);
 
         let builder = CreateChannel::new(channel_name.clone())
             .kind(ChannelType::Voice)
@@ -79,8 +74,7 @@ async fn on_voice_channel_join(
             .category(config.category_id)
             .position(number)
             .permissions(vec![PermissionOverwrite {
-                allow: Permissions::MOVE_MEMBERS
-                    | Permissions::MANAGE_CHANNELS,
+                allow: Permissions::MOVE_MEMBERS | Permissions::MANAGE_CHANNELS,
                 deny: Permissions::empty(),
                 kind: PermissionOverwriteType::Member(member.user.id),
             }])
@@ -145,23 +139,26 @@ async fn on_voice_channel_join(
 async fn on_voice_channel_leave(
     ctx: &Context,
     storage: &Arc<impl Storage + Send + Sync + ?Sized>,
-    member: &Member,
+    _member: &Member,
     old_voice_state: VoiceState,
 ) {
     let old_channel_id = match old_voice_state.channel_id {
         None => return,
-        Some(old_channel_id) => old_channel_id
+        Some(old_channel_id) => old_channel_id,
     };
 
     let temp_channel = match storage.get_temporary_voice_channel(&old_channel_id).await {
         None => return,
-        Some(temp_channel) => temp_channel
+        Some(temp_channel) => temp_channel,
     };
 
     let channel = match old_channel_id.to_channel(ctx).await {
         Ok(Channel::Guild(channel)) => channel,
         Err(why) => {
-            println!("Failed to retrieve the channel or it is not a guild channel: {}", why);
+            println!(
+                "Failed to retrieve the channel or it is not a guild channel: {}",
+                why
+            );
             return;
         }
         _ => {
@@ -172,7 +169,6 @@ async fn on_voice_channel_leave(
 
     let guild_id = channel.guild_id;
     let voice_channel_id = channel.id;
-
 
     let member_count = {
         let guild = match guild_id.to_guild_cached(ctx) {
@@ -198,9 +194,10 @@ async fn on_voice_channel_leave(
         println!("No members left, deleting the channel");
         match channel.delete(&ctx.http).await {
             Ok(_) => {
-                match storage.get_creator_voice_config(
-                    &temp_channel.creator_id
-                ).await {
+                match storage
+                    .get_creator_voice_config(&temp_channel.creator_id)
+                    .await
+                {
                     None => {
                         println!("Something went very wrong when deleting a channel!");
                         todo!()
@@ -208,7 +205,9 @@ async fn on_voice_channel_leave(
                     Some(mut creator_channel_config) => {
                         creator_channel_config.remove_number(&temp_channel.number);
 
-                        storage.set_creator_voice_config(&creator_channel_config).await
+                        storage
+                            .set_creator_voice_config(&creator_channel_config)
+                            .await
                     }
                 }
             }
