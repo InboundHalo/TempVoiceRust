@@ -31,9 +31,17 @@ impl CreatorChannelConfig {
     }
 }
 
-fn get_next_number(creator_channel_config: &CreatorChannelConfig, number: NonZeroU16) -> NonZeroU16 {
+fn get_next_number(
+    creator_channel_config: &CreatorChannelConfig,
+    number: NonZeroU16,
+) -> NonZeroU16 {
     if creator_channel_config.channel_numbers.contains(&number) {
-        get_next_number(creator_channel_config, number.checked_add(1).expect("This is adding a positive number so should never == 0"))
+        get_next_number(
+            creator_channel_config,
+            number
+                .checked_add(1)
+                .expect("This is adding a positive number so should never == 0"),
+        )
     } else {
         return number;
     }
