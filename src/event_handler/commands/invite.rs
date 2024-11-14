@@ -16,24 +16,12 @@ pub async fn run(ctx: &Context, command: &CommandInteraction, cooldown_manager: 
     let inviter = &command.user;
 
     let guild_id = match command.guild_id {
-        None => {
-            return CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .ephemeral(true)
-                    .content("This command can only be used in a server."),
-            );
-        }
+        None => return ephemeral_response("This command can only be used in a server."),
         Some(guild_id) => guild_id,
     };
 
     let invited_user = match get_invited_user(&command) {
-        None => {
-            return CreateInteractionResponse::Message(
-                CreateInteractionResponseMessage::new()
-                    .ephemeral(true)
-                    .content("You must mention a user to invite."),
-            );
-        }
+        None => return ephemeral_response("You must mention a user to invite."),
         Some(user_id) => user_id,
     };
 
@@ -60,9 +48,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction, cooldown_manager: 
     .await;
 
     match dm_result {
-        Err(_) => CreateInteractionResponse::Message(
-            ephemeral_response("Failed to send the invitation. The user might have DMs disabled."),
-        ),
+        Err(_) => ephemeral_response("Failed to send the invitation. The user might have DMs disabled."),
         Ok(_) => CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("Invitation sent to {}.", invited_user.mention())),
