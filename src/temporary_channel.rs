@@ -1,3 +1,4 @@
+use std::num::NonZeroU16;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
@@ -14,7 +15,7 @@ pub struct TemporaryVoiceChannel {
     pub(crate) owner_id: UserId,
     pub(crate) name: String,
     pub(crate) template_name: String,
-    pub(crate) number: u16,
+    pub(crate) number: NonZeroU16,
 }
 
 impl TemporaryVoiceChannel {
@@ -25,7 +26,7 @@ impl TemporaryVoiceChannel {
         owner_id: UserId,
         name: String,
         template_name: String,
-        number: u16,
+        number: NonZeroU16,
     ) -> Self {
         Self {
             guild_id,
@@ -41,7 +42,7 @@ impl TemporaryVoiceChannel {
 
 pub(crate) fn get_name_from_template(
     template_name: &String,
-    number: &u16,
+    number: &NonZeroU16,
     presence: Option<Presence>,
     user_name: &str,
 ) -> String {
@@ -165,11 +166,12 @@ fn get_end_modifiers(first_char_of_member_name: char) -> Vec<&'static str> {
 #[cfg(test)]
 mod tests {
     use crate::temporary_channel::{get_end_modifiers, get_name_from_template};
+    use std::num::NonZeroU16;
 
     #[test]
     fn check_template_name_1() {
         let template_name = "%name% - %number%";
-        let name = get_name_from_template(&template_name.to_string(), &83, None, "Inbound");
+        let name = get_name_from_template(&template_name.to_string(), &NonZeroU16::new(83).unwrap(), None, "Inbound");
 
         assert_eq!(name, "Inbound - 83")
     }
@@ -177,9 +179,9 @@ mod tests {
     #[test]
     fn check_template_name_2() {
         let template_name = "%name%'s %room%";
-        let name = get_name_from_template(&template_name.to_string(), &42, None, "ⱤoᵀᴛᵥƝₓˣ");
+        let name = get_name_from_template(&template_name.to_string(), &NonZeroU16::new(42).unwrap(), None, "ⱤoᵀᴛᵥƝₓˣ");
 
-        let room = name.strip_prefix("ⱤoᵀᴛᵥƝₓˣ's ");
+        let room = name.strip_prefix("ⱤoᵀᴛᵥƝₓˣ's "); // This was a user in a discord guild that did not have a normalised username
         assert_eq!(room.is_some(), true); // Assert that the prefix is "ⱤoᵀᴛᵥƝₓˣ's "
 
         assert!(get_end_modifiers('Ɽ').contains(&room.unwrap()));
