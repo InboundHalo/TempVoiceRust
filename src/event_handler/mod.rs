@@ -69,10 +69,9 @@ impl EventHandler for Handler {
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
 
-        Command::set_global_commands(&ctx, vec![
-            commands::invite::register(),
-            commands::add_creator_channel::register(),
-        ]).await.expect("Error registering global commands!");
+        Command::create_global_command(&ctx.http, commands::invite::register())
+            .await
+            .expect("Error registering global command: invite");
 
         println!("{} is ready!", ready.user.name);
     }
@@ -142,7 +141,6 @@ impl EventHandler for Handler {
             let command_name = command.data.name.as_str();
 
             let response = match command_name {
-                "add-creator-channel" => commands::add_creator_channel::run(&ctx, &command).await,
                 "invite" => commands::invite::run(&ctx, &command, &self.cooldown_manager).await,
                 _ => CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
