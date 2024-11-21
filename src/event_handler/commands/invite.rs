@@ -60,9 +60,7 @@ pub async fn run(ctx: &Context, command: &CommandInteraction, cooldown_manager: 
     .await;
 
     match dm_result {
-        Err(_) => CreateInteractionResponse::Message(
-            ephemeral_response("Failed to send the invitation. The user might have DMs disabled."),
-        ),
+        Err(_) => return ephemeral_response("Failed to send the invitation. The user might have DMs disabled."),
         Ok(_) => CreateInteractionResponse::Message(
             CreateInteractionResponseMessage::new()
                 .content(format!("Invitation sent to {}.", invited_user.mention())),
@@ -86,10 +84,12 @@ async fn dm_user(
     ).await
 }
 
-fn ephemeral_response(string: &str) -> CreateInteractionResponse::Message {
-    CreateInteractionResponseMessage::new()
-        .ephemeral(true)
-        .content(string)
+fn ephemeral_response(string: &str) -> CreateInteractionResponse {
+    CreateInteractionResponse::Message(
+        CreateInteractionResponseMessage::new()
+            .ephemeral(true)
+            .content(string)
+    )
 }
 
 fn get_invited_user(command: &CommandInteraction) -> Option<&UserId> {
