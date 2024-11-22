@@ -1,5 +1,6 @@
 use crate::event_handler::cool_down_manager::CooldownManager;
-use serenity::all::{ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Mentionable, Message, User, UserId, VoiceState};
+use crate::StorageKey;
+use serenity::all::{ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage, EditChannel, GuildId, Mentionable, Message, PermissionOverwrite, PermissionOverwriteType, Permissions, User, UserId, VoiceState};
 use serenity::builder::{CreateCommand, CreateCommandOption, CreateMessage};
 use serenity::http::Http;
 use std::collections::HashMap;
@@ -58,21 +59,61 @@ pub async fn run(
         return ephemeral_response("You cannot invite someone who is already in the voice channel.");
     }
 
+    // Check if user is owner of the voice channel if so give the invited user perms
+    let storage = {
+        let data_read = ctx.data.read().await;
+        match data_read.get::<StorageKey>().cloned() {
+            None => {
+                println!("Storage is null!");
+                panic!()
+            }
+            Some(storage) => storage,
+        }
+    };
+
+    let temporary_voice_channel = storage.get_temporary_voice_channel(&voice_channel_id).await;
+
+    let is_owner_of_voice_channel = match temporary_voice_channel {
+        None => false,
+        Some(temporary_voice_channel) => temporary_voice_channel.owner_id == inviter.id,
+    };
+
+    let mut guild_channel = match voice_channel_id.to_channel(ctx).await {
+        Ok(channel) => channel.guild(),
+        Err(_) => None
+    };
+
+    if is_owner_of_voice_channel {
+        let permissions = PermissionOverwrite {
+            allow: Permissions::CONNECT | Permissions::VIEW_CHANNEL,
+            deny: Permissions::empty(),
+            kind: PermissionOverwriteType::Member(invited_user.clone()),
+        };
+        
+        let _ = voice_channel_id.create_permission(ctx, permissions).await;
+    }
+
+    let can_connect = match guild_channel {
+        None => false,
+        Some(guild_channel) => match guild_channel.permissions_for_user(ctx, invited_user.clone()) {
+            Err(_) => false,
+            Ok(permissions) => permissions.administrator() || (permissions.connect() && permissions.view_channel())
+        }
+    };
+
     let dm_result = dm_user(
         ctx.http.clone(),
         invited_user,
         inviter,
         get_channel_link(guild_id, voice_channel_id),
-    ).await;
-    
-    match dm_result {
-        Err(_) => {
-            ephemeral_response("Failed to send the invitation. The user might have DMs disabled.")
+    );
+
+    match can_connect {
+        true => match dm_result.await {
+            Ok(_) => CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(format!("Invitation sent to {}.", invited_user.mention()))),
+            Err(_) => CreateInteractionResponse::Message(CreateInteractionResponseMessage::new().content(format!("Failed to send the invitation. The {} might have DMs disabled. They have been pinged and can join however.", invited_user.mention()))),
         }
-        Ok(_) => CreateInteractionResponse::Message(
-            CreateInteractionResponseMessage::new()
-                .content(format!("Invitation sent to {}.", invited_user.mention())),
-        ),
+        false => ephemeral_response("User can not connect to voice channel!"),
     }
 }
 
