@@ -1,16 +1,32 @@
 use std::sync::Arc;
 
+mod commands;
+mod cool_down_manager;
+
 use crate::storage::Storage;
 use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
 use crate::StorageKey;
 use async_trait::async_trait;
 use serenity::all::{
-    Channel, ChannelId, ChannelType, Context, CreateChannel, EditChannel, EventHandler,
-    GuildChannel, Member, Message, PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState,
+    Channel, ChannelId, ChannelType, Command, Context, CreateChannel, CreateInteractionResponse,
+    EditChannel, EventHandler, GuildChannel, Interaction, Member, Message,
+    PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState,
 };
+use serenity::builder::CreateInteractionResponseMessage;
 use serenity::model::Permissions;
+use crate::event_handler::cool_down_manager::CooldownManager;
 
-pub(crate) struct Handler;
+pub(crate) struct Handler {
+    cooldown_manager: CooldownManager
+}
+
+impl Handler {
+    pub fn new() -> Self {
+        Self {
+            cooldown_manager: CooldownManager::new(),
+        }
+    }
+}
 
 #[async_trait]
 impl EventHandler for Handler {
@@ -18,7 +34,7 @@ impl EventHandler for Handler {
         &self,
         ctx: Context,
         channel: GuildChannel,
-        _messages: Option<Vec<Message>>,
+        messages: Option<Vec<Message>>,
     ) {
         let storage = {
             let data_read = ctx.data.read().await;
@@ -50,8 +66,12 @@ impl EventHandler for Handler {
         }
     }
 
-    async fn ready(&self, _ctx: Context, ready: Ready) {
+    async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
+
+        Command::create_global_command(&ctx.http, commands::invite::register())
+            .await
+            .expect("Error registering global command: invite");
 
         println!("{} is ready!", ready.user.name);
     }
@@ -113,6 +133,26 @@ impl EventHandler for Handler {
         // Member leaves a voice channel
         if old_voice_state.is_some() {
             on_voice_channel_leave(&ctx, &storage, old_voice_state.unwrap()).await;
+        }
+    }
+
+    async fn interaction_create(&self, ctx: Context, interaction: Interaction) {
+        if let Interaction::Command(command) = interaction {
+            let command_name = command.data.name.as_str();
+
+            let response = match command_name {
+                "invite" => commands::invite::run(&ctx, &command, &self.cooldown_manager).await,
+                _ => CreateInteractionResponse::Message(
+                    CreateInteractionResponseMessage::new()
+                        .ephemeral(true)
+                        .content(format!(
+                            "Something when wrong with the command: `{}`",
+                            command_name
+                        )),
+                ),
+            };
+
+            let _ = command.create_response(ctx, response).await;
         }
     }
 }
@@ -179,6 +219,8 @@ async fn on_voice_channel_join(
         Ok(channel) => channel,
         Err(_) => return Some(Err("Could not create guild channel")),
     };
+    
+    println!("Created channel: {} with number {}", channel.name, number);
 
     let channel_id = channel.id;
 
@@ -210,12 +252,17 @@ async fn on_voice_channel_join(
         storage.set_creator_voice_config(&config).await;
 
         if number == highest_number {
-            if let Err(why) = creator_channel_id
-                .edit(ctx, EditChannel::new().position(highest_number.get() + 1))
-                .await
-            {
-                println!("Error editing channel positions: {:?}", why);
-                // Do not return as this does not matter too much if it fails
+            let new_position = highest_number.get() + 1;
+            
+            let change_creator_channel_position = creator_channel_id.edit(ctx, EditChannel::new().position(new_position));
+            
+            match change_creator_channel_position.await {
+                Ok(_) => {
+                    println!("Changed creator channel's position to: {}", new_position)
+                }
+                Err(why) => {
+                    println!("Error editing channel positions: {:?}", why);
+                }
             }
         }
     } else {
@@ -276,13 +323,8 @@ async fn on_voice_channel_leave(
         count
     };
 
-    println!(
-        "There are {} members left in the channel {}.",
-        member_count, temp_channel.number
-    );
-
     if member_count == 0 {
-        println!("No members left, deleting the channel");
+        println!("No members left, deleting the channel: {}", temp_channel.name);
         match channel.delete(&ctx.http).await {
             Ok(_) => {
                 match storage
@@ -295,7 +337,7 @@ async fn on_voice_channel_leave(
                     }
                     Some(mut creator_channel_config) => {
                         creator_channel_config.remove_number(&temp_channel.number);
-
+                
                         storage
                             .set_creator_voice_config(&creator_channel_config)
                             .await;

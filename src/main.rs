@@ -49,7 +49,7 @@ async fn setup_discord_bot() -> Client {
         | GatewayIntents::GUILD_PRESENCES;
 
     Client::builder(&token, intents)
-        .event_handler(event_handler::Handler)
+        .event_handler(event_handler::Handler::new())
         .await
         .expect("Err creating client")
 }
