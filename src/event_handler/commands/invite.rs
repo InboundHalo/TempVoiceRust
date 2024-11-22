@@ -1,12 +1,9 @@
-use serenity::all::{
-    ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType,
-    Context, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Mentionable,
-    Message, User, UserId, VoiceState,
-};
-use serenity::builder::{CreateCommand, CreateCommandOption, CreateMessage};
-use std::collections::HashMap;
-
 use crate::event_handler::cool_down_manager::CooldownManager;
+use serenity::all::{ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Mentionable, Message, User, UserId, VoiceState};
+use serenity::builder::{CreateCommand, CreateCommandOption, CreateMessage};
+use serenity::http::Http;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub fn register() -> CreateCommand {
     CreateCommand::new("invite")
@@ -44,25 +41,30 @@ pub async fn run(
         return ephemeral_response("You can not invite a bot!");
     }
 
-    let voice_states = &guild_id.to_guild_cached(&ctx).unwrap().voice_states;
+    let voice_states = {
+        let guild = match guild_id.to_guild_cached(&ctx) {
+            Some(guild) => guild.clone(),
+            None => return ephemeral_response("Failed to retrieve guild data."),
+        };
+        guild.voice_states.clone()
+    };
+    
     let voice_channel_id = match get_voice_channel_id(voice_states.get(&inviter.id)) {
         None => return ephemeral_response("You must be in a voice channel to use this command."),
         Some(channel_id) => channel_id,
     };
 
-    if !is_invited_user_in_same_voice_channel(&voice_states, &voice_channel_id, &invited_user) {
+    if is_invited_user_in_same_voice_channel(&voice_states, &voice_channel_id, &invited_user) {
         return ephemeral_response("You cannot invite someone who is already in the voice channel.");
     }
-    
-    
 
     let dm_result = dm_user(
-        ctx,
+        ctx.http.clone(),
         invited_user,
         inviter,
         get_channel_link(guild_id, voice_channel_id),
-    )
-    .await;
+    ).await;
+    
     match dm_result {
         Err(_) => {
             ephemeral_response("Failed to send the invitation. The user might have DMs disabled.")
@@ -74,7 +76,7 @@ pub async fn run(
     }
 }
 
-fn is_invited_user_in_same_voice_channel(voice_states: &&HashMap<UserId, VoiceState>, voice_channel_id: &ChannelId, invited_user: &&UserId) -> bool {
+fn is_invited_user_in_same_voice_channel(voice_states: &HashMap<UserId, VoiceState>, voice_channel_id: &ChannelId, invited_user: &&UserId) -> bool {
     voice_states.iter().any(|(user_id, voice_state)| {
         let is_in_same_voice_channel = match voice_state.channel_id {
             None => return false,
@@ -90,7 +92,7 @@ fn is_invited_user_in_same_voice_channel(voice_states: &&HashMap<UserId, VoiceSt
 }
 
 async fn dm_user(
-    ctx: &Context,
+    ctx: Arc<Http>,
     invited_user: &UserId,
     inviter: &User,
     channel_invite: String,

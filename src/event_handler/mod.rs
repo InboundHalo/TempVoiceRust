@@ -219,6 +219,8 @@ async fn on_voice_channel_join(
         Ok(channel) => channel,
         Err(_) => return Some(Err("Could not create guild channel")),
     };
+    
+    println!("Created channel: {} with number {}", channel.name, number);
 
     let channel_id = channel.id;
 
@@ -250,12 +252,17 @@ async fn on_voice_channel_join(
         storage.set_creator_voice_config(&config).await;
 
         if number == highest_number {
-            if let Err(why) = creator_channel_id
-                .edit(ctx, EditChannel::new().position(highest_number.get() + 1))
-                .await
-            {
-                println!("Error editing channel positions: {:?}", why);
-                // Do not return as this does not matter too much if it fails
+            let new_position = highest_number.get() + 1;
+            
+            let change_creator_channel_position = creator_channel_id.edit(ctx, EditChannel::new().position(new_position));
+            
+            match change_creator_channel_position.await {
+                Ok(_) => {
+                    println!("Changed creator channel's position to: {}", new_position)
+                }
+                Err(why) => {
+                    println!("Error editing channel positions: {:?}", why);
+                }
             }
         }
     } else {
@@ -316,13 +323,8 @@ async fn on_voice_channel_leave(
         count
     };
 
-    println!(
-        "There are {} members left in the channel {}.",
-        member_count, temp_channel.number
-    );
-
     if member_count == 0 {
-        println!("No members left, deleting the channel");
+        println!("No members left, deleting the channel: {}", temp_channel.name);
         match channel.delete(&ctx.http).await {
             Ok(_) => {
                 match storage
@@ -335,7 +337,7 @@ async fn on_voice_channel_leave(
                     }
                     Some(mut creator_channel_config) => {
                         creator_channel_config.remove_number(&temp_channel.number);
-
+                
                         storage
                             .set_creator_voice_config(&creator_channel_config)
                             .await;
