@@ -171,7 +171,12 @@ mod tests {
     #[test]
     fn check_template_name_1() {
         let template_name = "%name% - %number%";
-        let name = get_name_from_template(&template_name.to_string(), &NonZeroU16::new(83).unwrap(), None, "Inbound");
+        let name = get_name_from_template(
+            &template_name.to_string(),
+            &NonZeroU16::new(83).unwrap(),
+            None,
+            "Inbound",
+        );
 
         assert_eq!(name, "Inbound - 83")
     }
@@ -179,7 +184,12 @@ mod tests {
     #[test]
     fn check_template_name_2() {
         let template_name = "%name%'s %room%";
-        let name = get_name_from_template(&template_name.to_string(), &NonZeroU16::new(42).unwrap(), None, "ⱤoᵀᴛᵥƝₓˣ");
+        let name = get_name_from_template(
+            &template_name.to_string(),
+            &NonZeroU16::new(42).unwrap(),
+            None,
+            "ⱤoᵀᴛᵥƝₓˣ",
+        );
 
         let room = name.strip_prefix("ⱤoᵀᴛᵥƝₓˣ's "); // This was a user in a discord guild that did not have a normalised username
         assert_eq!(room.is_some(), true); // Assert that the prefix is "ⱤoᵀᴛᵥƝₓˣ's "
