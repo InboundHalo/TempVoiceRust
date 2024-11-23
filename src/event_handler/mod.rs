@@ -71,7 +71,7 @@ impl EventHandler for Handler {
         
         Command::set_global_commands(&ctx, vec![
             commands::invite::register(),
-            commands::add_creator_channel::register(),
+            commands::creator_channel::register(),
         ]).await
             .expect("Error registering global command");
 
@@ -144,7 +144,7 @@ impl EventHandler for Handler {
 
             let response = match command_name {
                 "invite" => commands::invite::run(&ctx, &command, &self.cooldown_manager).await,
-                "add-creator-channel" => commands::add_creator_channel::run(&ctx, &command).await,
+                "creator-channel" => commands::creator_channel::run(&ctx, &command).await,
                 _ => CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .ephemeral(true)

@@ -29,6 +29,10 @@ impl CreatorChannelConfig {
     pub(crate) fn get_highest_number(&self) -> Option<NonZeroU16> {
         self.channel_numbers.iter().max().cloned()
     }
+    
+    pub(crate) fn reset(&mut self) {
+        self.channel_numbers = HashSet::new();
+    }
 }
 
 fn get_next_number(

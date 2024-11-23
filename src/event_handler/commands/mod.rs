@@ -1,2 +1,2 @@
 pub mod invite;
-pub mod add_creator_channel;
+pub mod creator_channel;
