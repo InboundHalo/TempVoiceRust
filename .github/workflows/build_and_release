@@ -1,0 +1,42 @@
+name: Build and Release Binaries
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build Binaries
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, windows-latest]
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions/setup-rust@v1
+        with:
+          rust-toolchain: stable
+
+      - name: Build for Linux
+        if: matrix.platform == 'ubuntu-latest'
+        run: |
+          cargo build --release
+          mkdir -p artifacts
+          mv target/release/TempVoiceRust artifacts/TempVoiceRust-linux
+
+      - name: Build for Windows
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cargo build --release
+          mkdir artifacts
+          move target\release\TempVoiceRust.exe artifacts\TempVoiceRust-windows.exe
+
+      - name: Upload Binaries
+        uses: actions/upload-artifact@v3
+        with:
+          name: binaries
+          path: artifacts/
