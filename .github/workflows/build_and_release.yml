@@ -29,11 +29,12 @@ jobs:
           mv target/release/TempVoiceRust artifacts/TempVoiceRust-linux
 
       - name: Build for Windows
-        if: matrix.platform == 'windows-latest'
+        if: runner.os == 'Windows'
+        shell: powershell
         run: |
           cargo build --release
-          mkdir artifacts
-          move target\release\TempVoiceRust.exe artifacts\TempVoiceRust-windows.exe
+          New-Item -ItemType Directory -Path artifacts -Force
+          Move-Item target\release\TempVoiceRust.exe artifacts\TempVoiceRust-windows.exe
 
       - name: Upload Binaries
         uses: actions/upload-artifact@v3
