@@ -1,6 +1,5 @@
 use std::num::NonZeroU16;
-use std::time::{SystemTime, UNIX_EPOCH};
-
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serenity::all::{ActivityType, ChannelId, Context, GuildId, Presence, UserId};
 use serenity::futures::AsyncReadExt;
@@ -118,13 +117,7 @@ fn get_end_modifier(member_name: &str) -> &str {
     assert!(end_modifiers.len() > 0);
 
     let len = end_modifiers.len();
-    let index = {
-        let duration_since_epoch = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .expect("Time went backwards");
-        let nanos = duration_since_epoch.subsec_nanos() as usize;
-        nanos % len
-    };
+    let index = rand::prelude::thread_rng().gen_range(0..len);
 
     end_modifiers[index]
 }
@@ -135,7 +128,7 @@ fn get_end_modifiers(first_char_of_member_name: char) -> Vec<&'static str> {
     return match first_char_of_member_name.to_ascii_lowercase() {
         'a' => vec!["Atrium", "Arcade", "Arena", "Area"],
         'b' => vec!["Bureau", "Base", "Building"],
-        'c' => vec!["Corner", "Court", "Cave", "City"],
+        'c' => vec!["Corner", "Court", "Cave", "City", "Cool-de-Sac", "Club", "Chill-Zone"],
         'd' => vec!["Domain", "Den", "Depot", "District"],
         'e' => vec!["Estate", "Embassy", "Entrance"],
         'f' => vec!["Fortress", "Farmhouse", "Factory"],
