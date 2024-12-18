@@ -1,6 +1,11 @@
 use crate::event_handler::cool_down_manager::CooldownManager;
 use crate::StorageKey;
-use serenity::all::{ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage, EditChannel, GuildId, Mentionable, Message, PermissionOverwrite, PermissionOverwriteType, Permissions, User, UserId, VoiceState};
+use serenity::all::{
+    ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType,
+    Context, CreateInteractionResponse, CreateInteractionResponseMessage, EditChannel, GuildId,
+    Mentionable, Message, PermissionOverwrite, PermissionOverwriteType, Permissions, User, UserId,
+    VoiceState,
+};
 use serenity::builder::{CreateCommand, CreateCommandOption, CreateMessage};
 use serenity::http::Http;
 use std::collections::HashMap;
@@ -49,14 +54,16 @@ pub async fn run(
         };
         guild.voice_states.clone()
     };
-    
+
     let voice_channel_id = match get_voice_channel_id(voice_states.get(&inviter.id)) {
         None => return ephemeral_response("You must be in a voice channel to use this command."),
         Some(channel_id) => channel_id,
     };
 
     if is_invited_user_in_same_voice_channel(&voice_states, &voice_channel_id, &invited_user) {
-        return ephemeral_response("You cannot invite someone who is already in the voice channel.");
+        return ephemeral_response(
+            "You cannot invite someone who is already in the voice channel.",
+        );
     }
 
     // Check if user is owner of the voice channel if so give the invited user perms
@@ -80,24 +87,33 @@ pub async fn run(
 
     let mut guild_channel = match voice_channel_id.to_channel(ctx).await {
         Ok(channel) => channel.guild(),
-        Err(_) => None
+        Err(_) => None,
     };
 
     if is_owner_of_voice_channel {
         let permissions = PermissionOverwrite {
-            allow: Permissions::CONNECT | Permissions::VIEW_CHANNEL,
+            allow: Permissions::VIEW_CHANNEL
+                | Permissions::CONNECT
+                | Permissions::SPEAK
+                | Permissions::SEND_MESSAGES
+                | Permissions::READ_MESSAGE_HISTORY,
             deny: Permissions::empty(),
             kind: PermissionOverwriteType::Member(invited_user.clone()),
         };
-        
+
         let _ = voice_channel_id.create_permission(ctx, permissions).await;
     }
 
     let can_connect = match guild_channel {
         None => false,
-        Some(guild_channel) => match guild_channel.permissions_for_user(ctx, invited_user.clone()) {
-            Err(_) => false,
-            Ok(permissions) => permissions.administrator() || (permissions.connect() && permissions.view_channel())
+        Some(guild_channel) => {
+            match guild_channel.permissions_for_user(ctx, invited_user.clone()) {
+                Err(_) => false,
+                Ok(permissions) => {
+                    permissions.administrator()
+                        || (permissions.connect() && permissions.view_channel())
+                }
+            }
         }
     };
 
@@ -117,7 +133,11 @@ pub async fn run(
     }
 }
 
-fn is_invited_user_in_same_voice_channel(voice_states: &HashMap<UserId, VoiceState>, voice_channel_id: &ChannelId, invited_user: &&UserId) -> bool {
+fn is_invited_user_in_same_voice_channel(
+    voice_states: &HashMap<UserId, VoiceState>,
+    voice_channel_id: &ChannelId,
+    invited_user: &&UserId,
+) -> bool {
     voice_states.iter().any(|(user_id, voice_state)| {
         let is_in_same_voice_channel = match voice_state.channel_id {
             None => return false,
