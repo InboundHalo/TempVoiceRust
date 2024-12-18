@@ -50,7 +50,6 @@ impl EventHandler for Handler {
         match storage.get_temporary_voice_channel(&channel.id).await {
             None => {}
             Some(_) => {
-                println!("Temporary voice channel removed!");
                 storage.delete_temporary_voice_channel(&channel.id).await;
                 return;
             }
@@ -59,7 +58,6 @@ impl EventHandler for Handler {
         match storage.get_creator_voice_config(&channel.id).await {
             None => {}
             Some(_) => {
-                println!("Voice creator config removed!");
                 storage.delete_creator_voice_config(&channel.id).await;
                 return;
             }
@@ -124,9 +122,7 @@ impl EventHandler for Handler {
                     Err(why) => {
                         println!("Error joining channel: {:?}", why);
                         match member.disconnect_from_voice(&ctx).await {
-                            Ok(_) => {
-                                println!("Disconnected from voice channel");
-                            }
+                            Ok(_) => {}
                             Err(_) => {
                                 println!("Failed to disconnect from voice channel");
                             }
@@ -279,9 +275,7 @@ async fn on_voice_channel_join(
                 creator_channel_id.edit(ctx, EditChannel::new().position(new_position));
 
             match change_creator_channel_position.await {
-                Ok(_) => {
-                    println!("Changed creator channel's position to: {}", new_position)
-                }
+                Ok(_) => {}
                 Err(why) => {
                     println!("Error editing channel positions: {:?}", why);
                 }
@@ -346,10 +340,6 @@ async fn on_voice_channel_leave(
     };
 
     if member_count == 0 {
-        println!(
-            "No members left, deleting the channel: {}",
-            temp_channel.name
-        );
         match channel.delete(&ctx.http).await {
             Ok(_) => {
                 match storage
@@ -358,7 +348,7 @@ async fn on_voice_channel_leave(
                 {
                     None => {
                         println!("Something went very wrong when deleting a channel!");
-                        todo!()
+                        panic!()
                     }
                     Some(mut creator_channel_config) => {
                         creator_channel_config.remove_number(&temp_channel.number);
@@ -372,7 +362,7 @@ async fn on_voice_channel_leave(
             }
             Err(_) => {
                 println!("Something went very wrong when deleting a channel!");
-                todo!()
+                panic!()
             }
         };
     }

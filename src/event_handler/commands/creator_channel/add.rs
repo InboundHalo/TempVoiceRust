@@ -27,8 +27,6 @@ pub fn get_command_option() -> CreateCommandOption {
 }
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) -> CreateInteractionResponse {
-    println!("running creator-channel add");
-    
     let creator_channel_config = match get_creator_channel_config(command) {
         None => return create_response("Something went wrong when trying to parse the command options!"),
         Some(creator_channel_config) => creator_channel_config,
@@ -78,8 +76,6 @@ fn get_creator_channel_config(command: &CommandInteraction) -> Option<CreatorCha
             .iter()
             .map(|opt| (opt.name.as_str(), &opt.value))
     );
-
-    println!("{:#?}", option_map);
 
     let creator_id:  ChannelId  = extract_option!(option_map, "creator_id",      as_channel_id)?;
     let category_id: ChannelId  = extract_option!(option_map, "category_id",     as_channel_id)?;

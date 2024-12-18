@@ -2,7 +2,6 @@ use std::collections::HashMap;
 
 use serenity::all::{CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage};
 use serenity::builder::CreateCommandOption;
-
 use crate::StorageKey;
 
 macro_rules! extract_option {
@@ -26,8 +25,6 @@ pub fn get_command_option() -> CreateCommandOption {
 }
 
 pub async fn run(ctx: &Context, command: &CommandInteraction) -> CreateInteractionResponse {
-    println!("Running creator-channel reset");
-
     let reset_option = match command.data.options.iter().find(|opt| opt.name == "reset") {
         None => return create_response("Something went wrong when trying to parse the command options!"),
         Some(command_data_option) => command_data_option,
