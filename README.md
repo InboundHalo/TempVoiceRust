@@ -20,12 +20,12 @@ Placeholders that you can use with template name include:
 ## Examples
 `%name%'s %room%`
 
-DrJ.Sins's Domain
-Inbound's Inn
-Inbound's Island 
-ⱤoᵀᴛᵥƝₓˣ's Room
-ⱤoᵀᴛᵥƝₓˣ's Resort
-ⱤoᵀᴛᵥƝₓˣ's Retreat
+- DrJ.Sins's Domain
+- Inbound's Inn
+- Inbound's Island
+- ⱤoᵀᴛᵥƝₓˣ's Room
+- ⱤoᵀᴛᵥƝₓˣ's Resort
+- ⱤoᵀᴛᵥƝₓˣ's Retreat
 
 `Ranked %number%`
 Ranked 1
