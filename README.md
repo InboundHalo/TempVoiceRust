@@ -28,9 +28,9 @@ Placeholders that you can use with template name include:
 - ⱤoᵀᴛᵥƝₓˣ's Retreat
 
 `Ranked %number%`
-Ranked 1
-Ranked 3
-Ranked 4
-Ranked 5
-Ranked 7
 
+- Ranked 1
+- Ranked 3
+- Ranked 4
+- Ranked 5
+- Ranked 7
