@@ -1,5 +1,5 @@
 use std::num::NonZeroU16;
-use rand::Rng;
+use rand::{rng, Rng};
 use serde::{Deserialize, Serialize};
 use serenity::all::{ActivityType, ChannelId, Context, GuildId, Presence, UserId};
 use serenity::futures::AsyncReadExt;
@@ -117,7 +117,7 @@ fn get_end_modifier(member_name: &str) -> &str {
     assert!(end_modifiers.len() > 0);
 
     let len = end_modifiers.len();
-    let index = rand::prelude::thread_rng().gen_range(0..len);
+    let index = rng().random_range(0..len);
 
     end_modifiers[index]
 }
