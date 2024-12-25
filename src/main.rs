@@ -22,7 +22,7 @@ async fn main() {
     println!("Starting up");
 
     let database_path =
-        env::var("DATABASE_PATH").expect("Expected a database path in the environment");
+        env::var("DATABASE_PATH").expect("Expected token: `DATABASE_PATH` in the environment");
 
     let storage: Arc<dyn Storage + Send + Sync> =
         Arc::new(SQLiteStorage::new(database_path.as_str()).expect("Failed to initialize storage"));
@@ -39,8 +39,8 @@ async fn main() {
 }
 
 async fn setup_discord_bot() -> Client {
-    let token = env::var("DISCORD_TOKEN").expect("Expected a token in the environment");
-
+    let token = env::var("DISCORD_TOKEN").expect("Expected token: `DISCORD_TOKEN` in the environment");
+    
     let intents = GatewayIntents::GUILD_VOICE_STATES
         | GatewayIntents::GUILDS
         | GatewayIntents::GUILD_MEMBERS

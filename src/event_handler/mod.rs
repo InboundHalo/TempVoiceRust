@@ -3,21 +3,21 @@ use std::sync::Arc;
 mod commands;
 mod cool_down_manager;
 
+use crate::event_handler::cool_down_manager::CooldownManager;
 use crate::storage::Storage;
 use crate::temporary_channel::{get_name_from_template, get_user_presence, TemporaryVoiceChannel};
 use crate::StorageKey;
 use async_trait::async_trait;
 use serenity::all::{
     Channel, ChannelId, ChannelType, Command, Context, CreateChannel, CreateInteractionResponse,
-    EditChannel, EventHandler, GuildChannel, Interaction, Member, Message,
-    PermissionOverwrite, PermissionOverwriteType, Ready, VoiceState,
+    EditChannel, EventHandler, GuildChannel, Interaction, Member, Message, PermissionOverwrite,
+    PermissionOverwriteType, Ready, VoiceState,
 };
 use serenity::builder::CreateInteractionResponseMessage;
 use serenity::model::Permissions;
-use crate::event_handler::cool_down_manager::CooldownManager;
 
 pub(crate) struct Handler {
-    cooldown_manager: CooldownManager
+    cooldown_manager: CooldownManager,
 }
 
 impl Handler {
@@ -50,7 +50,6 @@ impl EventHandler for Handler {
         match storage.get_temporary_voice_channel(&channel.id).await {
             None => {}
             Some(_) => {
-                println!("Temporary voice channel removed!");
                 storage.delete_temporary_voice_channel(&channel.id).await;
                 return;
             }
@@ -59,7 +58,6 @@ impl EventHandler for Handler {
         match storage.get_creator_voice_config(&channel.id).await {
             None => {}
             Some(_) => {
-                println!("Voice creator config removed!");
                 storage.delete_creator_voice_config(&channel.id).await;
                 return;
             }
@@ -68,12 +66,16 @@ impl EventHandler for Handler {
 
     async fn ready(&self, ctx: Context, ready: Ready) {
         println!("{} is connected!", ready.user.name);
-        
-        Command::set_global_commands(&ctx, vec![
-            commands::invite::register(),
-            commands::add_creator_channel::register(),
-        ]).await
-            .expect("Error registering global command");
+
+        Command::set_global_commands(
+            &ctx,
+            vec![
+                commands::invite::register(),
+                commands::creator_channel::register(),
+            ],
+        )
+        .await
+        .expect("Error registering global command");
 
         println!("{} is ready!", ready.user.name);
     }
@@ -120,9 +122,7 @@ impl EventHandler for Handler {
                     Err(why) => {
                         println!("Error joining channel: {:?}", why);
                         match member.disconnect_from_voice(&ctx).await {
-                            Ok(_) => {
-                                println!("Disconnected from voice channel");
-                            }
+                            Ok(_) => {}
                             Err(_) => {
                                 println!("Failed to disconnect from voice channel");
                             }
@@ -144,7 +144,7 @@ impl EventHandler for Handler {
 
             let response = match command_name {
                 "invite" => commands::invite::run(&ctx, &command, &self.cooldown_manager).await,
-                "add-creator-channel" => commands::add_creator_channel::run(&ctx, &command).await,
+                "creator-channel" => commands::creator_channel::run(&ctx, &command).await,
                 _ => CreateInteractionResponse::Message(
                     CreateInteractionResponseMessage::new()
                         .ephemeral(true)
@@ -199,7 +199,16 @@ async fn on_voice_channel_join(
     let mut permissions_overrides = creator_channel.permission_overwrites.clone();
 
     permissions_overrides.push(PermissionOverwrite {
-        allow: Permissions::MOVE_MEMBERS | Permissions::MANAGE_CHANNELS,
+        allow: Permissions::MOVE_MEMBERS
+            | Permissions::MANAGE_CHANNELS
+            | Permissions::MANAGE_ROLES
+            | Permissions::VIEW_CHANNEL
+            | Permissions::CONNECT
+            | Permissions::SPEAK
+            | Permissions::PRIORITY_SPEAKER
+            | Permissions::SEND_MESSAGES
+            | Permissions::READ_MESSAGE_HISTORY,
+
         deny: Permissions::empty(),
         kind: PermissionOverwriteType::Member(member.user.id),
     });
@@ -207,9 +216,14 @@ async fn on_voice_channel_join(
     let bitrate = creator_channel.bitrate.unwrap_or_else(|| 64000);
     let nsfw = creator_channel.nsfw;
 
+    let user_limit = match creator_channel.user_limit {
+        None => config.user_limit,
+        Some(user_limit) => user_limit,
+    };
+
     let builder = CreateChannel::new(channel_name.clone())
         .kind(ChannelType::Voice)
-        .user_limit(config.user_limit)
+        .user_limit(user_limit)
         .category(config.category_id)
         .position(number.get())
         .permissions(permissions_overrides)
@@ -222,7 +236,7 @@ async fn on_voice_channel_join(
         Ok(channel) => channel,
         Err(_) => return Some(Err("Could not create guild channel")),
     };
-    
+
     println!("Created channel: {} with number {}", channel.name, number);
 
     let channel_id = channel.id;
@@ -256,13 +270,12 @@ async fn on_voice_channel_join(
 
         if number == highest_number {
             let new_position = highest_number.get() + 1;
-            
-            let change_creator_channel_position = creator_channel_id.edit(ctx, EditChannel::new().position(new_position));
-            
+
+            let change_creator_channel_position =
+                creator_channel_id.edit(ctx, EditChannel::new().position(new_position));
+
             match change_creator_channel_position.await {
-                Ok(_) => {
-                    println!("Changed creator channel's position to: {}", new_position)
-                }
+                Ok(_) => {}
                 Err(why) => {
                     println!("Error editing channel positions: {:?}", why);
                 }
@@ -327,7 +340,6 @@ async fn on_voice_channel_leave(
     };
 
     if member_count == 0 {
-        println!("No members left, deleting the channel: {}", temp_channel.name);
         match channel.delete(&ctx.http).await {
             Ok(_) => {
                 match storage
@@ -336,11 +348,11 @@ async fn on_voice_channel_leave(
                 {
                     None => {
                         println!("Something went very wrong when deleting a channel!");
-                        todo!()
+                        panic!()
                     }
                     Some(mut creator_channel_config) => {
                         creator_channel_config.remove_number(&temp_channel.number);
-                
+
                         storage
                             .set_creator_voice_config(&creator_channel_config)
                             .await;
@@ -350,7 +362,7 @@ async fn on_voice_channel_leave(
             }
             Err(_) => {
                 println!("Something went very wrong when deleting a channel!");
-                todo!()
+                panic!()
             }
         };
     }
