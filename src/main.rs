@@ -21,8 +21,15 @@ impl TypeMapKey for StorageKey {
 async fn main() {
     println!("Starting up");
 
-    let database_path =
-        env::var("DATABASE_PATH").expect("Expected token: `DATABASE_PATH` in the environment");
+    let database_path = {
+        let mut database_path = env::var("DATABASE_PATH").expect("Expected token: `DATABASE_PATH` in the environment");
+
+        if database_path.is_empty() || database_path.ends_with("/") {
+            database_path.push_str("database.db");
+        }
+        
+        database_path
+    };
 
     let storage: Arc<dyn Storage + Send + Sync> =
         Arc::new(SQLiteStorage::new(database_path.as_str()).expect("Failed to initialize storage"));
