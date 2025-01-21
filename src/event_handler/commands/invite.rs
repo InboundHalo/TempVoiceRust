@@ -1,11 +1,6 @@
 use crate::event_handler::cool_down_manager::CooldownManager;
 use crate::StorageKey;
-use serenity::all::{
-    ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType,
-    Context, CreateInteractionResponse, CreateInteractionResponseMessage, EditChannel, GuildId,
-    Mentionable, Message, PermissionOverwrite, PermissionOverwriteType, Permissions, User, UserId,
-    VoiceState,
-};
+use serenity::all::{ChannelId, CommandDataOption, CommandDataOptionValue, CommandInteraction, CommandOptionType, Context, CreateInteractionResponse, CreateInteractionResponseMessage, GuildId, Mentionable, Message, PermissionOverwrite, PermissionOverwriteType, Permissions, User, UserId, VoiceState};
 use serenity::builder::{CreateCommand, CreateCommandOption, CreateMessage};
 use serenity::http::Http;
 use std::collections::HashMap;
@@ -85,7 +80,7 @@ pub async fn run(
         Some(temporary_voice_channel) => temporary_voice_channel.owner_id == inviter.id,
     };
 
-    let mut guild_channel = match voice_channel_id.to_channel(ctx).await {
+    let guild_channel = match voice_channel_id.to_channel(ctx).await {
         Ok(channel) => channel.guild(),
         Err(_) => None,
     };
@@ -108,13 +103,13 @@ pub async fn run(
     let can_connect = match guild_channel {
         None => false,
         Some(guild_channel) => {
-            match guild_channel.permissions_for_user(ctx, invited_user.clone()) {
-                Err(_) => false,
-                Ok(permissions) => {
-                    permissions.administrator()
-                        || (permissions.connect() && permissions.view_channel())
-                }
-            }
+            if let Some(guild) = guild_channel.guild(ctx) {
+                if let Some(member) = guild.members.get(invited_user) {
+                    let permissions = guild.user_permissions_in(&guild_channel, member);
+
+                    permissions.administrator() || (permissions.connect() && permissions.view_channel())
+                } else { false }
+            } else { false }
         }
     };
 
