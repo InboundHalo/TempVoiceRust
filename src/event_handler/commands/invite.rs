@@ -93,6 +93,7 @@ pub async fn run(
     if is_owner_of_voice_channel {
         let permissions = PermissionOverwrite {
             allow: Permissions::VIEW_CHANNEL
+                | Permissions::MOVE_MEMBERS // This permission lets the invited user join even if the voice channel is full
                 | Permissions::CONNECT
                 | Permissions::SPEAK
                 | Permissions::SEND_MESSAGES
