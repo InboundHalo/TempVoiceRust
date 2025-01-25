@@ -33,7 +33,7 @@ impl EventHandler for Handler {
     async fn channel_delete(
         &self,
         ctx: Context,
-        channel: GuildChannel,
+        deleted_channel: GuildChannel,
         messages: Option<Vec<Message>>,
     ) {
         let storage = {
@@ -46,20 +46,20 @@ impl EventHandler for Handler {
                 Some(storage) => storage,
             }
         };
-
-        match storage.get_temporary_voice_channel(&channel.id).await {
-            None => {}
-            Some(_) => {
-                storage.delete_temporary_voice_channel(&channel.id).await;
-                return;
+        
+        match storage.get_temporary_voice_channel(&deleted_channel.id).await {
+            None => {
+                match storage.get_creator_voice_config(&deleted_channel.id).await {
+                    None => {
+                        println!("Deleted channel is not [ temporary channel, creator channel ]");
+                    }
+                    Some(_) => {
+                        storage.delete_creator_voice_config(&deleted_channel.id).await;
+                    }
+                }
             }
-        }
-
-        match storage.get_creator_voice_config(&channel.id).await {
-            None => {}
-            Some(_) => {
-                storage.delete_creator_voice_config(&channel.id).await;
-                return;
+            Some(temporary_channel) => {
+                remove_deleted_temporary_channel(&storage, &temporary_channel, &deleted_channel).await;
             }
         }
     }
@@ -341,29 +341,33 @@ async fn on_voice_channel_leave(
 
     if member_count == 0 {
         match channel.delete(&ctx.http).await {
-            Ok(_) => {
-                match storage
-                    .get_creator_voice_config(&temp_channel.creator_id)
-                    .await
-                {
-                    None => {
-                        println!("Something went very wrong when deleting a channel!");
-                        panic!()
-                    }
-                    Some(mut creator_channel_config) => {
-                        creator_channel_config.remove_number(&temp_channel.number);
-
-                        storage
-                            .set_creator_voice_config(&creator_channel_config)
-                            .await;
-                        storage.delete_temporary_voice_channel(&channel.id).await;
-                    }
-                }
+            Ok(deleted_channel) => {
+                remove_deleted_temporary_channel(storage, &temp_channel, &deleted_channel).await;
             }
-            Err(_) => {
-                println!("Something went very wrong when deleting a channel!");
+            Err(error) => {
+                println!("Something went very wrong when deleting a channel! {}", error);
                 panic!()
             }
         };
+    }
+}
+
+/// Assuming that the voice channel is deleted
+async fn remove_deleted_temporary_channel(storage: &Arc<impl Storage + Send + Sync + ?Sized>, temp_channel: &TemporaryVoiceChannel, deleted_channel: &GuildChannel) {
+    match storage
+        .get_creator_voice_config(&temp_channel.creator_id)
+        .await
+    {
+        None => {
+            println!("Something went very wrong when deleting a channel!");
+            panic!()
+        }
+        Some(mut creator_channel_config) => {
+            creator_channel_config.remove_number(&temp_channel.number);
+
+            storage.set_creator_voice_config(&creator_channel_config).await;
+
+            storage.delete_temporary_voice_channel(&deleted_channel.id).await;
+        }
     }
 }
