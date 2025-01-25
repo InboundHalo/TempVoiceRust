@@ -1,3 +1,5 @@
 /target
 /.cargo
+.idea
+database.db
 my_test_database.db
